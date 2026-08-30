@@ -27,9 +27,7 @@ bus.Dispatcher.RegisterCommandHandler<CreateOrderCommand>(async (command, cancel
             await Task.Delay(1000, cancellationToken);
 
             /*
-             * Gerçekte:
-             *
-             * await httpClient.PostAsync(...)
+             * Gerçekte: await httpClient.PostAsync(...)
              */
 
             Console.WriteLine("Order oluşturuldu.");
@@ -49,8 +47,7 @@ bus.Dispatcher.RegisterQueryHandler<GetOrderQuery, OrderResponse>(async (query, 
             /*
              * Gerçekte:
              *
-             * return await httpClient
-             *     .GetFromJsonAsync<OrderResponse>(...)
+             * return await httpClient.GetFromJsonAsync<OrderResponse>(...)
              */
 
             return new OrderResponse(query.OrderId, "Completed", 1500);
