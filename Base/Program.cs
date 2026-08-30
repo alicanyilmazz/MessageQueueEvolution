@@ -27,7 +27,7 @@ queueService.Start();
 
 
 // Settlement
-queueService.SettlementQueue.AddSettlement(serialNumber: 1001, amount: 1000, transactionCode: "WITHDRAW");
+queueService.SettlementQueue.AddSettlement(transactionId: 1001, amount: 1000, transactionCode: "WITHDRAW");
 
 
 // Reversal
@@ -35,7 +35,7 @@ queueService.ReversalQueue.AddReversal(transactionId: 1002, amount: 500, transac
 
 
 // Refund
-queueService.RefundQueue.AddRefund(serialNumber: 1003, amount: 1500, transactionCode: "RECON");
+queueService.RefundQueue.AddRefund(transactionId: 1003, amount: 1500, transactionCode: "RECON");
 
 Console.WriteLine();
 Console.WriteLine("Messages added to queues.");
