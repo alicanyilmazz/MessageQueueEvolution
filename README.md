@@ -8,6 +8,23 @@ Instead, the repository intentionally starts with simple, tightly coupled and do
 
 The goal is to understand **why** concepts such as message dispatching, retry policies, cancellation, timeouts, message envelopes, custom queues and message buses exist.
 
+## Evolution Roadmap
+
+| Version | Stage | Status |
+|---|---|---|
+| V1 | `01-PrimitiveQueue` | ✅ Completed |
+| V2 | `02-GenericMessageBus` | 🚧 Current |
+| V3 | `03-ResilientMessageBus` | ⏳ Planned |
+| V4 | `04-ConcurrentMessageBus` | ⏳ Planned |
+| V5 | `05-AdvancedQueueing` | ⏳ Planned |
+| V6 | `06-PersistentMessageBus` | ⏳ Planned |
+| V7 | `07-ReliableMessageBus` | ⏳ Planned |
+| V8 | `08-ObservableMessageBus` | ⏳ Planned |
+| V9 | `09-DistributedMessageBus` | ⏳ Planned |
+| V10 | `10-ProductionMessagingPlatform` | ⏳ Planned |
+
+> **Current Stage: V2 — GenericMessageBus**
+
 ---
 
 # Why This Repository Exists
