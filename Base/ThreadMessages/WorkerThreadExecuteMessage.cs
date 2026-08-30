@@ -2,12 +2,12 @@
 
 namespace Base.Messages;
 
-public class WorkerThreadExecuteMessage : WorkerThreadMessageBase
+public class WorkerThreadExecuteMessage : WorkerThreadBaseMessage
 {
     public Action Action { get; set; }
 
     public WorkerThreadExecuteMessage()
     {
-        MessageType = WorkerThreadMessageType.Execute;
+        MessageType = WorkerThreadMessageTypes.Execute;
     }
 }

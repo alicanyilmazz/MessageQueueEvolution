@@ -1,21 +1,18 @@
 ﻿using Base.Core;
 using Base.Messages;
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Text;
 
-namespace Base;
+namespace Base.Manager;
 
 public class WorkerQueueManager
 {
-    public Queue<WorkerThreadMessageBase> MsgQueue { get; private set; }
+    public Queue<WorkerThreadBaseMessage> MsgQueue { get; private set; }
 
     private readonly Thread _workerThread;
 
     public WorkerQueueManager()
     {
-        MsgQueue = new Queue<WorkerThreadMessageBase>();
+        MsgQueue = new Queue<WorkerThreadBaseMessage>();
 
         _workerThread = new Thread(WorkerThreadRun);
 
@@ -28,13 +25,13 @@ public class WorkerQueueManager
     // PRODUCER
     // ==================================================
 
-    public void AddMessage(WorkerThreadMessageBase msg)
+    public void AddMessage(WorkerThreadBaseMessage msg)
     {
         lock (((ICollection)MsgQueue).SyncRoot)
         {
             MsgQueue.Enqueue(msg);
 
-            // Uyuyan WorkerThread'i uyandır.
+            // Wake up the sleeping WorkerThread. - Uyuyan WorkerThread'i uyandır.
             Monitor.Pulse(((ICollection)MsgQueue).SyncRoot);
         }
     }
@@ -47,18 +44,18 @@ public class WorkerQueueManager
     {
         while (true)
         {
-            WorkerThreadMessageBase msg;
+            WorkerThreadBaseMessage msg;
 
             lock (((ICollection)MsgQueue).SyncRoot)
             {
                 /*
-                 * Queue boşsa thread burada uyur.
+                 * If the queue is empty, the thread waits here.
                  *
                  * Monitor.Wait:
-                 * 1- lock'u bırakır
-                 * 2- thread'i uyutur
-                 * 3- Pulse gelince uyanır
-                 * 4- tekrar lock'u alır
+                 * 1- Releases the lock - lock u bırakır
+                 * 2- Puts the thread to sleep - thread i uykuya alır
+                 * 3- Wakes up when Pulse is called - Pulse çağrıldığında uyanır
+                 * 4- Reacquires the lock  - lock u tekrar alır
                  */
 
                 while (MsgQueue.Count == 0)
@@ -69,8 +66,8 @@ public class WorkerQueueManager
                 msg = MsgQueue.Dequeue();
             }
 
-            // Exit geldiyse Worker Thread kapanır.
-            if (msg.MessageType == WorkerThreadMessageType.Exit)
+            // If the message is an exit message, terminate the worker thread.
+            if (msg.MessageType == WorkerThreadMessageTypes.Exit)
             {
                 return;
             }
@@ -90,53 +87,47 @@ public class WorkerQueueManager
     // MESSAGE HANDLER
     // ==================================================
 
-    private void HandleWorkerThreadMessage(WorkerThreadMessageBase msg)
+    private void HandleWorkerThreadMessage(WorkerThreadBaseMessage msg)
     {
         switch (msg.MessageType)
         {
-            case WorkerThreadMessageType.HostQuery:
+            case WorkerThreadMessageTypes.Service:
                 {
-                    var hostQuery = (WorkerThreadHostQueryMessage)msg;
+                    var hostQuery = (WorkerThreadServiceMessage)msg;
                     HandleHostQuery(hostQuery);
                     break;
                 }
 
-            case WorkerThreadMessageType.Execute:
+            case WorkerThreadMessageTypes.Execute:
                 {
                     var execute = (WorkerThreadExecuteMessage)msg;
                     execute.Action?.Invoke();
                     break;
                 }
 
-            case WorkerThreadMessageType.SendLog:
+            case WorkerThreadMessageTypes.Activity:
                 {
-                    var log = (WorkerThreadLogMessage)msg;
+                    var log = (WorkerThreadActivityMessage)msg;
                     Console.WriteLine("LOG : " + log.LogMessage);
                     break;
                 }
 
-            case WorkerThreadMessageType.Diagnostics:
+            case WorkerThreadMessageTypes.System:
                 {
-                    Console.WriteLine("Diagnostics çalıştırıldı.");
-                    break;
-                }
-
-            case WorkerThreadMessageType.ScreenAfterLoad:
-                {
-                    Console.WriteLine("ScreenAfterLoad çalıştırıldı.");
+                    Console.WriteLine("System message received.");
                     break;
                 }
         }
     }
 
-    private void HandleHostQuery(WorkerThreadHostQueryMessage message)
+    private void HandleHostQuery(WorkerThreadServiceMessage message)
     {
-        Console.WriteLine("Host Query başladı : " + message.TransactionCode);
+        Console.WriteLine("Host Query Begin : " + message.TransactionCode);
 
-        // Burada gerçek host işlemini yaparsın.
+        // Handling host query logic here...
         Thread.Sleep(2000);
 
-        Console.WriteLine("Host Query tamamlandı : " + message.TransactionCode);
+        Console.WriteLine("Host Query Completed : " + message.TransactionCode);
     }
 
     // ==================================================
