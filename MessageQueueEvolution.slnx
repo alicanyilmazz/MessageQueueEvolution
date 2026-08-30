@@ -1,4 +1,4 @@
 <Solution>
-  <Project Path="Base/Base.csproj" />
-  <Project Path="General/General.csproj" />
+  <Project Path="Base/PrimitiveQueue.csproj" />
+  <Project Path="General/GenericMessageBus.csproj" />
 </Solution>
