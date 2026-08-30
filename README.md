@@ -2,27 +2,32 @@
 
 > **The queue is the project. Concurrency is the subject.**
 
-`MessageQueueEvolution` is a step-by-step journey through **threading, asynchronous programming, concurrency, synchronization, resilience, and message processing in C#**.
+`MessageQueueEvolution` is a step-by-step journey through **threading, asynchronous programming, concurrency, synchronization, resilience, and message processing in C#/.NET**.
 
 The main goal of this repository is **not simply to build another queue implementation**.
 
-Instead, a message queue is used as a practical environment to understand **why concurrency concepts and messaging abstractions exist in the first place**.
+Instead, a message queue is used as a practical environment to understand:
 
-Rather than learning concepts such as `Thread`, `Task`, `async/await`, `lock`, `Monitor`, `ConcurrentDictionary`, `Channel<T>`, `CancellationToken`, retry policies, backpressure, idempotency, and distributed messaging independently, this repository introduces them **when a real problem in the architecture requires them**.
+- how threads work,
+- how multiple threads coordinate,
+- how race conditions appear,
+- how shared state becomes dangerous,
+- how synchronization primitives solve different problems,
+- how asynchronous programming differs from multithreading,
+- how producer/consumer systems work,
+- and eventually why modern messaging systems such as RabbitMQ, MassTransit and Azure Service Bus provide the abstractions they do.
+
+Rather than studying these concepts independently, this repository introduces them **when a real problem in the evolving queue architecture requires them**.
 
 ---
 
-# The Learning Approach
+# Main Philosophy
 
-The repository intentionally does **not** start with the best possible architecture.
+The repository follows one simple rule:
 
-It starts with a simple implementation.
+> **Do not start with the abstraction. Start with the problem that creates the abstraction.**
 
-Then we break it.
-
-Then we understand why it breaks.
-
-Then we introduce the concept that solves the problem.
+The learning cycle is:
 
 ```text
 Build a simple version
@@ -31,13 +36,13 @@ Build a simple version
 Discover a problem
         │
         ▼
-Understand the concurrency / architecture issue
+Understand the threading / concurrency problem
         │
         ▼
-Introduce the appropriate concept
+Introduce the appropriate .NET concept
         │
         ▼
-Refactor the implementation
+Refactor the architecture
         │
         ▼
 Discover the next problem
@@ -46,68 +51,53 @@ Discover the next problem
 Repeat
 ```
 
-The purpose is to understand the transition from:
+The goal is not to immediately write the cleanest or most advanced architecture.
+
+Earlier implementations are intentionally kept in the repository so that we can understand:
+
+```text
+What was the original problem?
+
+Why did the previous solution become insufficient?
+
+What concurrency problem appeared?
+
+Why was a new abstraction introduced?
+
+What trade-off did the new solution create?
+```
+
+---
+
+# Why Use a Queue to Learn Concurrency?
+
+A queue looks simple:
 
 ```csharp
 Queue<T>
 ```
 
-to a much more capable message processing architecture.
-
----
-
-# Why Build It This Way?
-
-It is easy to use technologies such as:
-
-- RabbitMQ
-- MassTransit
-- MediatR
-- Kafka
-- Azure Service Bus
-- Hangfire
-- Polly
-
-without fully understanding why concepts such as these exist:
-
-```text
-Retry
-Backoff
-Cancellation
-Timeout
-Dead Letter Queue
-Idempotency
-Message Envelope
-CorrelationId
-Backpressure
-Outbox
-Inbox
-Circuit Breaker
-Consumer
-Producer
-Dispatcher
-```
-
-This repository approaches the subject from the opposite direction.
-
-Instead of starting with the abstraction, we start with the **problem that creates the abstraction**.
+But as soon as multiple execution paths start interacting with it, many fundamental computer science and .NET concepts naturally appear.
 
 For example:
 
 ```text
-Multiple threads access Queue<T>
+Two threads access Queue<T>
         │
         ▼
 Race Condition
         │
         ▼
-lock
+Critical Section
+        │
+        ▼
+lock / Monitor
 ```
 
 Then:
 
 ```text
-Worker continuously checks an empty queue
+Worker continuously checks whether Queue is empty
         │
         ▼
 Busy Waiting
@@ -119,37 +109,13 @@ Monitor.Wait / Monitor.Pulse
 Then:
 
 ```text
-Manual synchronization becomes complicated
+Multiple threads modify shared state
         │
         ▼
-Need a higher-level Producer / Consumer abstraction
+Thread Safety Problem
         │
         ▼
-Channel<T>
-```
-
-Then:
-
-```text
-Multiple threads manage pending messages
-        │
-        ▼
-Shared Mutable State
-        │
-        ▼
-ConcurrentDictionary<TKey, TValue>
-```
-
-Then:
-
-```text
-A running operation must be stopped
-        │
-        ▼
-Cooperative Cancellation
-        │
-        ▼
-CancellationToken
+Concurrent Collections
 ```
 
 Then:
@@ -167,28 +133,1656 @@ Bounded Channel
 Backpressure
 ```
 
-Every concept is introduced because the previous version creates a real reason to use it.
+Then:
+
+```text
+A long running operation must be stopped
+        │
+        ▼
+Cooperative Cancellation
+        │
+        ▼
+CancellationToken
+```
+
+Then:
+
+```text
+External API fails
+        │
+        ▼
+Retry
+        │
+        ▼
+Backoff
+        │
+        ▼
+Circuit Breaker
+```
+
+The queue gradually becomes a laboratory for understanding concurrency.
+
+---
+
+# What Will We Learn?
+
+The project will gradually explore the following topics.
+
+---
+
+## 1. Threads
+
+Starting with the lowest-level execution model:
+
+```text
+Thread
+ThreadStart
+ParameterizedThreadStart
+Thread.CurrentThread
+Thread.Name
+Thread.IsAlive
+Thread.Join
+Thread.Sleep
+Thread.Interrupt
+Background Threads
+Foreground Threads
+```
+
+Questions we want to understand:
+
+```text
+What is a thread?
+
+What happens when a Thread starts?
+
+What is the difference between foreground and background threads?
+
+What does Thread.Join do?
+
+Why is Thread.Sleep blocking?
+
+Why should we avoid creating unlimited Threads?
+```
+
+---
+
+# 2. ThreadPool
+
+Creating a dedicated OS thread for every operation is expensive.
+
+That naturally leads to:
+
+```text
+ThreadPool
+Worker Threads
+I/O Completion Threads
+ThreadPool.QueueUserWorkItem
+```
+
+And eventually:
+
+```text
+Task
+Task.Run
+async / await
+```
+
+We will understand why modern .NET applications usually work with the ThreadPool instead of manually creating a new Thread for every operation.
+
+---
+
+# 3. Race Conditions
+
+When multiple threads access shared state:
+
+```text
+Thread A
+    │
+    └── read value
+
+Thread B
+    │
+    └── change value
+
+Thread A
+    │
+    └── write old value
+```
+
+we can get unpredictable results.
+
+Topics:
+
+```text
+Race Condition
+Shared Mutable State
+Critical Section
+Atomicity
+Thread Safety
+```
+
+---
+
+# 4. lock
+
+One of the first synchronization mechanisms we encounter will be:
+
+```csharp
+lock (_sync)
+{
+    // critical section
+}
+```
+
+We will understand:
+
+```text
+What does lock actually do?
+
+Why does lock need a shared object?
+
+What is a critical section?
+
+What happens if a lock is held for too long?
+
+Why should external API calls generally not happen inside a lock?
+```
+
+---
+
+# 5. Monitor
+
+`lock` is built on top of `Monitor`.
+
+We will explore:
+
+```text
+Monitor.Enter
+Monitor.Exit
+Monitor.Wait
+Monitor.Pulse
+Monitor.PulseAll
+Monitor.TryEnter
+```
+
+The primitive queue starts with:
+
+```text
+Queue<T>
++
+Thread
++
+lock
++
+Monitor.Wait
++
+Monitor.Pulse
+```
+
+This gives us a low-level Producer / Consumer implementation.
+
+---
+
+# 6. Busy Waiting
+
+A naive worker might do this:
+
+```csharp
+while (true)
+{
+    if (queue.Count > 0)
+    {
+        // process
+    }
+}
+```
+
+This creates:
+
+```text
+Busy Waiting
+        │
+        ▼
+Unnecessary CPU Consumption
+```
+
+We will solve this first with:
+
+```text
+Monitor.Wait
+Monitor.Pulse
+```
+
+and later replace manual coordination with higher-level abstractions.
+
+---
+
+# 7. Mutex
+
+We will explore:
+
+```text
+Mutex
+Named Mutex
+Cross-Process Synchronization
+```
+
+and understand the important distinction:
+
+```text
+lock / Monitor
+    │
+    └── Synchronization inside a process
+
+Mutex
+    │
+    └── Can synchronize across processes
+```
+
+Example problem:
+
+```text
+Application Instance A
+        │
+        ▼
+Shared Resource
+
+Application Instance B
+        │
+        ▼
+Same Shared Resource
+```
+
+A named `Mutex` can coordinate them.
+
+We will also discuss why a Mutex is usually heavier than `lock`.
+
+---
+
+# 8. Semaphore
+
+We will explore:
+
+```text
+Semaphore
+SemaphoreSlim
+```
+
+A lock allows:
+
+```text
+1 thread at a time
+```
+
+A semaphore can allow:
+
+```text
+N operations at a time
+```
+
+For example:
+
+```text
+External API
+
+Maximum concurrent requests = 3
+
+        ┌── Worker 1
+API ◄───┼── Worker 2
+        └── Worker 3
+
+Worker 4 → waits
+Worker 5 → waits
+```
+
+This becomes very useful when we introduce multiple queue consumers.
+
+---
+
+# 9. SemaphoreSlim
+
+For modern asynchronous code we will primarily use:
+
+```csharp
+await semaphore.WaitAsync();
+```
+
+and:
+
+```csharp
+semaphore.Release();
+```
+
+This allows us to implement:
+
+```text
+Concurrency Limits
+Throttling
+Limited Parallelism
+Resource Protection
+```
+
+without unnecessarily blocking threads.
+
+---
+
+# 10. Interlocked
+
+Sometimes using a full lock is unnecessary.
+
+We will explore atomic operations such as:
+
+```text
+Interlocked.Increment
+Interlocked.Decrement
+Interlocked.Exchange
+Interlocked.CompareExchange
+Interlocked.Add
+```
+
+For example:
+
+```csharp
+Interlocked.CompareExchange(
+    ref _isProcessing,
+    1,
+    0);
+```
+
+can be used to prevent multiple workers from entering a section simultaneously.
+
+This will help us understand:
+
+```text
+Atomic Operations
+Lock-Free Operations
+Compare-And-Swap
+```
+
+---
+
+# 11. volatile and Memory Visibility
+
+Concurrency is not only about two threads writing at the same time.
+
+Another important problem is:
+
+> When one thread changes a value, when does another thread see that change?
+
+We will explore concepts such as:
+
+```text
+volatile
+Memory Visibility
+CPU Cache
+Compiler Reordering
+Memory Ordering
+Memory Barriers
+```
+
+These topics will be introduced only where they help explain actual concurrency behavior.
+
+---
+
+# 12. Concurrent Collections
+
+Instead of protecting every collection manually with locks, .NET provides concurrent collections.
+
+We will explore:
+
+```text
+ConcurrentDictionary<TKey, TValue>
+ConcurrentQueue<T>
+ConcurrentStack<T>
+ConcurrentBag<T>
+BlockingCollection<T>
+```
+
+---
+
+# 13. ConcurrentDictionary
+
+For example, our Message Bus needs to track pending messages:
+
+```text
+MessageId
+    │
+    ▼
+MessageEnvelope
+```
+
+At the same time:
+
+```text
+Producer
+    └── Adds message
+
+Worker
+    └── Removes completed message
+
+Cancellation Request
+    └── Finds message
+
+Retry Logic
+    └── Reads message
+```
+
+Using:
+
+```csharp
+Dictionary<Guid, MessageEnvelope>
+```
+
+from multiple threads would be dangerous.
+
+This creates the need for:
+
+```csharp
+ConcurrentDictionary<Guid, MessageEnvelope>
+```
+
+We will learn operations such as:
+
+```text
+TryAdd
+TryRemove
+TryGetValue
+GetOrAdd
+AddOrUpdate
+```
+
+and also understand an important point:
+
+> A thread-safe collection does not automatically make the entire business operation thread-safe.
+
+---
+
+# 14. ConcurrentQueue
+
+We will compare:
+
+```text
+Queue<T> + lock
+```
+
+with:
+
+```text
+ConcurrentQueue<T>
+```
+
+and understand what problems `ConcurrentQueue` solves and what problems it does **not** solve.
+
+For example:
+
+```text
+ConcurrentQueue
+```
+
+can make enqueue/dequeue thread-safe, but it does not automatically provide:
+
+```text
+Waiting
+Backpressure
+Message Scheduling
+Cancellation
+```
+
+---
+
+# 15. BlockingCollection
+
+Before moving to `Channel<T>`, we may also explore:
+
+```text
+BlockingCollection<T>
+```
+
+which provides a higher-level Producer / Consumer abstraction.
+
+This helps show the evolution:
+
+```text
+Queue<T>
++
+Monitor
+        │
+        ▼
+BlockingCollection<T>
+        │
+        ▼
+Channel<T>
+```
+
+---
+
+# 16. Task
+
+We will move from manually created Threads toward:
+
+```text
+Task
+Task<TResult>
+Task.Run
+Task.WhenAll
+Task.WhenAny
+Task.Delay
+```
+
+and understand that:
+
+> A Task is not the same thing as a Thread.
+
+Important topics:
+
+```text
+Thread vs Task
+
+Task Scheduling
+
+ThreadPool
+
+CPU-bound work
+
+I/O-bound work
+```
+
+---
+
+# 17. async / await
+
+The project will gradually move from blocking code:
+
+```csharp
+Thread.Sleep(5000);
+```
+
+toward asynchronous code:
+
+```csharp
+await Task.Delay(5000);
+```
+
+This allows us to understand:
+
+```text
+Blocking vs Non-Blocking
+
+Synchronous vs Asynchronous
+
+async
+
+await
+
+Continuation
+
+I/O-bound operations
+```
+
+---
+
+# 18. Concurrency vs Parallelism
+
+These two concepts are often confused.
+
+We will distinguish:
+
+```text
+Concurrency
+
+Multiple tasks making progress during overlapping periods
+```
+
+from:
+
+```text
+Parallelism
+
+Multiple operations physically executing at the same time
+```
+
+Our queue will eventually demonstrate both.
+
+---
+
+# 19. CancellationToken
+
+Long-running operations need cooperative cancellation.
+
+We will explore:
+
+```text
+CancellationToken
+CancellationTokenSource
+Cancel
+CancelAfter
+ThrowIfCancellationRequested
+IsCancellationRequested
+```
+
+Handlers may receive:
+
+```csharp
+CancellationToken cancellationToken
+```
+
+and propagate it into operations such as:
+
+```csharp
+await httpClient.SendAsync(
+    request,
+    cancellationToken);
+```
+
+---
+
+# 20. Linked Cancellation Tokens
+
+A queue operation may need to stop because of:
+
+```text
+User Cancellation
+
+Queue Shutdown
+
+Timeout
+```
+
+Instead of handling each separately, we can create:
+
+```csharp
+CancellationTokenSource.CreateLinkedTokenSource(...)
+```
+
+This gives us a unified cancellation model.
+
+---
+
+# 21. TaskCompletionSource
+
+A queued message executes sometime in the future.
+
+But the caller may want to await its result.
+
+For example:
+
+```text
+Caller
+   │
+   ▼
+Queue Message
+   │
+   ▼
+Worker
+   │
+   ▼
+Result
+   │
+   ▼
+Caller continues
+```
+
+This introduces:
+
+```text
+TaskCompletionSource<T>
+```
+
+which allows infrastructure code to manually complete a `Task`.
+
+It will become the foundation of:
+
+```text
+MessageHandle
+Query Result
+Message Completion
+```
+
+---
+
+# 22. Producer / Consumer
+
+One of the core patterns of the project:
+
+```text
+Producer
+    │
+    ▼
+Queue
+    │
+    ▼
+Consumer
+```
+
+Later:
+
+```text
+                  Queue
+                    │
+         ┌──────────┼──────────┐
+         ▼          ▼          ▼
+     Consumer 1 Consumer 2 Consumer 3
+```
+
+This will introduce:
+
+```text
+Multiple Consumers
+Work Distribution
+Ordering
+Concurrency
+Load
+```
+
+---
+
+# 23. Channel<T>
+
+Eventually manual synchronization:
+
+```text
+Queue<T>
+lock
+Monitor.Wait
+Monitor.Pulse
+```
+
+becomes complicated.
+
+This leads to:
+
+```csharp
+Channel<T>
+```
+
+We will explore:
+
+```text
+Channel<T>
+
+ChannelReader<T>
+
+ChannelWriter<T>
+
+ReadAsync
+
+WriteAsync
+
+WaitToReadAsync
+
+TryRead
+
+TryWrite
+```
+
+---
+
+# 24. Bounded vs Unbounded Channels
+
+An unbounded queue can continue growing:
+
+```text
+Producer
+Producer
+Producer
+Producer
+Producer
+        │
+        ▼
+      Queue
+        │
+        ▼
+     Consumer
+```
+
+If producers are faster:
+
+```text
+Queue Size
+10
+100
+1,000
+10,000
+100,000
+...
+```
+
+Memory usage may continuously increase.
+
+This introduces:
+
+```text
+BoundedChannelOptions
+Capacity
+```
+
+---
+
+# 25. Backpressure
+
+Once a queue has limited capacity:
+
+```text
+Queue Capacity = 100
+```
+
+we need to decide what happens when it is full.
+
+Possible strategies:
+
+```text
+Wait
+
+Drop Oldest
+
+Drop Newest
+
+Drop Write
+```
+
+This introduces the important distributed systems concept:
+
+> **Backpressure**
+
+---
+
+# 26. Multiple Workers
+
+Later versions will move from:
+
+```text
+Queue
+  │
+  ▼
+Worker
+```
+
+to:
+
+```text
+                   Queue
+                     │
+        ┌────────────┼────────────┐
+        ▼            ▼            ▼
+     Worker 1     Worker 2     Worker 3
+```
+
+This creates new problems:
+
+```text
+Ordering
+
+Race Conditions
+
+Shared State
+
+Resource Contention
+
+Duplicate Processing
+
+Concurrency Limits
+```
+
+---
+
+# 27. Ordering
+
+With one worker:
+
+```text
+A
+B
+C
+```
+
+usually becomes:
+
+```text
+A → B → C
+```
+
+With multiple workers:
+
+```text
+A → Worker 1
+B → Worker 2
+C → Worker 3
+```
+
+completion may become:
+
+```text
+B → C → A
+```
+
+This forces us to discuss:
+
+```text
+FIFO
+
+Processing Order
+
+Completion Order
+
+Partitioning
+
+Ordered Consumers
+```
+
+---
+
+# 28. Retry
+
+External systems fail.
+
+Our message system therefore needs:
+
+```text
+Retry
+Maximum Attempt Count
+Retryable Error
+Non-Retryable Error
+```
+
+---
+
+# 29. Retry Backoff
+
+Instead of:
+
+```text
+Retry
+Retry
+Retry
+Retry
+Retry
+```
+
+we may use:
+
+```text
+Attempt 1
+    │
+  1 second
+    ▼
+Attempt 2
+    │
+  2 seconds
+    ▼
+Attempt 3
+    │
+  4 seconds
+    ▼
+Attempt 4
+```
+
+Strategies will include:
+
+```text
+Fixed Retry
+
+Linear Backoff
+
+Exponential Backoff
+
+Custom Retry Policy
+```
+
+and eventually:
+
+```text
+Jitter
+```
+
+to prevent many consumers from retrying at exactly the same moment.
+
+---
+
+# 30. Delayed Retry
+
+A worker should not be blocked while waiting for a retry.
+
+Bad:
+
+```text
+Message fails
+     │
+     ▼
+Worker sleeps 5 minutes
+```
+
+Better:
+
+```text
+Message fails
+     │
+     ▼
+Schedule retry
+     │
+     └───────── 5 minutes ──────────┐
+                                    │
+Worker                              │
+  │                                 │
+  ├── Message B                     │
+  ├── Message C                     │
+  └── Message D                     │
+                                    │
+                                    ▼
+                              Retry Message A
+```
+
+---
+
+# 31. Timeout
+
+A message may have a maximum allowed execution time.
+
+```text
+Message
+   │
+   ▼
+Handler
+   │
+   │ > 5 seconds
+   ▼
+Timeout
+```
+
+This will help separate:
+
+```text
+Cancellation
+```
+
+from:
+
+```text
+Timeout
+```
+
+---
+
+# 32. Circuit Breaker
+
+Retries alone are not enough.
+
+If a downstream API is completely unavailable:
+
+```text
+Request
+   X
+Retry
+   X
+Retry
+   X
+Retry
+   X
+```
+
+we may be making the problem worse.
+
+This introduces:
+
+```text
+Circuit Breaker
+
+Closed
+Open
+Half-Open
+```
+
+and helps explain frameworks such as Polly.
+
+---
+
+# 33. Priority Queues
+
+Not every message is equally important.
+
+Later versions may introduce:
+
+```text
+Critical
+High
+Normal
+Low
+```
+
+and explore:
+
+```text
+PriorityQueue<TElement, TPriority>
+```
+
+---
+
+# 34. Scheduled and Delayed Messages
+
+Messages may need to execute:
+
+```text
+5 minutes later
+
+Tomorrow at 10:00
+
+At a specific DateTime
+```
+
+This introduces:
+
+```text
+Delayed Messages
+Scheduled Messages
+Timers
+Scheduling
+```
+
+and helps explain tools such as Hangfire and Quartz.
+
+---
+
+# 35. Graceful Shutdown
+
+What happens when the application shuts down while messages are being processed?
+
+We will explore:
+
+```text
+Stop accepting messages
+
+Complete current work
+
+Cancel remaining work
+
+Drain queue
+
+Shutdown workers
+
+Dispose resources
+```
+
+rather than simply killing the process.
+
+---
+
+# 36. Persistence
+
+In-memory messages disappear if the process crashes.
+
+Eventually we will introduce:
+
+```text
+Persistent Queue
+
+SQL Server
+
+Redis
+
+Message Store
+```
+
+and states such as:
+
+```text
+Pending
+
+Processing
+
+Completed
+
+Failed
+```
+
+---
+
+# 37. Recovery
+
+After restart:
+
+```text
+Application starts
+        │
+        ▼
+Read unfinished messages
+        │
+        ▼
+Recover
+        │
+        ▼
+Continue processing
+```
+
+This moves the architecture from an in-memory queue toward a durable messaging system.
+
+---
+
+# 38. Dead Letter Queue
+
+What happens when a message has failed too many times?
+
+Instead of deleting it:
+
+```text
+Message
+   │
+Retry
+   X
+Retry
+   X
+Retry
+   X
+   │
+   ▼
+Dead Letter Queue
+```
+
+This introduces:
+
+```text
+DLQ
+
+Poison Messages
+
+Manual Investigation
+
+Replay
+```
+
+---
+
+# 39. Idempotency
+
+Retries create an important problem.
+
+Suppose:
+
+```text
+ChargeCustomerCommand
+```
+
+runs successfully, but the acknowledgement is lost.
+
+The message is retried.
+
+Without protection:
+
+```text
+100 TL charge
++
+100 TL charge
+```
+
+may occur.
+
+This introduces:
+
+> **Idempotency**
+
+---
+
+# 40. Deduplication
+
+Distributed systems may deliver the same message more than once.
+
+Using:
+
+```text
+MessageId
+```
+
+we can detect already processed messages.
+
+This introduces:
+
+```text
+Deduplication
+
+Processed Message Store
+```
+
+---
+
+# 41. Delivery Semantics
+
+As the project becomes distributed we will discuss:
+
+```text
+At-Most-Once
+
+At-Least-Once
+
+Exactly-Once
+```
+
+and why true exactly-once processing is much harder than it first appears.
+
+---
+
+# 42. Message Envelope
+
+Business data and infrastructure metadata should be separated.
+
+Instead of putting everything inside the business message:
+
+```text
+MessageEnvelope
+│
+├── MessageId
+├── CorrelationId
+├── CreatedAt
+├── Attempt
+├── Timeout
+├── RetryPolicy
+├── Cancellation
+└── Message
+```
+
+This becomes a fundamental messaging abstraction.
+
+---
+
+# 43. Command / Query
+
+Messages may represent different intentions:
+
+```text
+IMessage
+   │
+   ├── ICommand
+   │
+   └── IQuery<TResult>
+```
+
+For example:
+
+```csharp
+CreateOrderCommand
+```
+
+means:
+
+> Do something.
+
+while:
+
+```csharp
+GetOrderQuery
+```
+
+means:
+
+> Return something.
+
+---
+
+# 44. Message Dispatcher
+
+Instead of:
+
+```csharp
+switch (message.Type)
+{
+    ...
+}
+```
+
+we will introduce:
+
+```text
+Message
+    │
+    ▼
+Dispatcher
+    │
+    ▼
+Handler
+```
+
+This reduces coupling between infrastructure and business logic.
+
+---
+
+# 45. Custom Queues
+
+The infrastructure should not require:
+
+```text
+RefundQueue class
+EmailQueue class
+ReportQueue class
+PaymentQueue class
+```
+
+Instead:
+
+```csharp
+bus.CreateQueue("commands");
+
+bus.CreateQueue("queries");
+
+bus.CreateQueue("background");
+```
+
+or:
+
+```csharp
+bus.CreateQueue("payments");
+bus.CreateQueue("notifications");
+```
+
+The important principle is:
+
+> **The domain uses the queue infrastructure.  
+> The queue infrastructure does not know the domain.**
+
+---
+
+# 46. CorrelationId
+
+When one operation produces multiple messages:
+
+```text
+HTTP Request
+CorrelationId = ABC
+        │
+        ▼
+CreateOrderCommand
+CorrelationId = ABC
+        │
+        ▼
+PaymentCommand
+CorrelationId = ABC
+        │
+        ▼
+SendEmailCommand
+CorrelationId = ABC
+```
+
+we need a way to follow the entire operation.
+
+This introduces:
+
+```text
+CorrelationId
+CausationId
+MessageId
+```
+
+---
+
+# 47. Observability
+
+As the system grows, we need answers to questions such as:
+
+```text
+How many messages are waiting?
+
+How many failed?
+
+How many retries occurred?
+
+How long does processing take?
+
+Which handler is slow?
+
+Which queue is overloaded?
+```
+
+This introduces:
+
+```text
+Structured Logging
+
+Metrics
+
+Tracing
+
+OpenTelemetry
+```
+
+---
+
+# 48. Distributed Messaging
+
+Eventually the queue leaves the process.
+
+Instead of:
+
+```text
+Application
+    │
+    ▼
+In-Memory Queue
+```
+
+we move toward:
+
+```text
+Order Service
+      │
+      ▼
+   RabbitMQ
+      │
+   ┌──┴─────────────┐
+   ▼                ▼
+Payment Service  Notification Service
+```
+
+This introduces a completely new set of concurrency and reliability problems.
+
+---
+
+# 49. RabbitMQ
+
+The project will eventually compare our in-memory implementation with a real message broker.
+
+Concepts will include:
+
+```text
+Producer
+
+Consumer
+
+Exchange
+
+Queue
+
+Binding
+
+Routing Key
+
+Acknowledgement
+
+Nack
+
+Requeue
+
+Prefetch
+
+Dead Letter Exchange
+```
+
+The goal is to understand **why RabbitMQ provides these concepts**, not simply how to configure them.
+
+---
+
+# 50. Outbox Pattern
+
+A classic distributed systems problem:
+
+```text
+Save database record
+        │
+        ✓
+Publish message
+        │
+        X
+```
+
+Now the database says the operation succeeded but no message was published.
+
+This introduces:
+
+> **Transactional Outbox Pattern**
+
+---
+
+# 51. Inbox Pattern
+
+Consumers also need protection against duplicate delivery.
+
+This introduces:
+
+```text
+Inbox
+
+Processed Message Tracking
+
+Deduplication
+
+Idempotent Consumer
+```
+
+---
+
+# 52. Eventual Consistency
+
+Once multiple services own different databases:
+
+```text
+Order DB
+
+Payment DB
+
+Notification DB
+```
+
+they cannot always update everything inside one transaction.
+
+This introduces:
+
+> **Eventual Consistency**
+
+and prepares the architecture for real microservice messaging.
 
 ---
 
 # Evolution Roadmap
 
-The repository evolves through multiple versions.
-
 | Version | Stage | Status | Main Focus |
 |---|---|---|---|
-| V1 | `01-PrimitiveQueue` | ✅ Completed | Thread, Queue, Monitor, Producer / Consumer |
-| V2 | `02-GenericMessageBus` | 🚧 Current | Generic Messages, Command / Query, Dispatcher, Channel, Retry, Cancellation |
-| V3 | `03-ResilientMessageBus` | ⏳ Planned | Advanced Retry, Backoff, Timeout, Circuit Breaker |
-| V4 | `04-ConcurrentMessageBus` | ⏳ Planned | Multiple Workers, Parallel Consumers, Ordering, SemaphoreSlim |
+| V1 | `01-PrimitiveQueue` | ✅ Completed | Thread, Queue, lock, Monitor, Producer / Consumer |
+| V2 | `02-GenericMessageBus` | 🚧 Current | Task, async/await, Channel, ConcurrentDictionary, Command / Query, Retry, Cancellation |
+| V3 | `03-ResilientMessageBus` | ⏳ Planned | Retry Policies, Backoff, Timeout, Circuit Breaker |
+| V4 | `04-ConcurrentMessageBus` | ⏳ Planned | Multiple Workers, SemaphoreSlim, Race Conditions, Ordering |
 | V5 | `05-AdvancedQueueing` | ⏳ Planned | Priority, Scheduling, Delayed Messages, Backpressure |
-| V6 | `06-PersistentMessageBus` | ⏳ Planned | Persistence, Restart Recovery, Durable Messages |
-| V7 | `07-ReliableMessageBus` | ⏳ Planned | Dead Letter Queue, Idempotency, Deduplication |
+| V6 | `06-PersistentMessageBus` | ⏳ Planned | Persistence, Recovery, Durable Messages |
+| V7 | `07-ReliableMessageBus` | ⏳ Planned | DLQ, Idempotency, Deduplication, Delivery Semantics |
 | V8 | `08-ObservableMessageBus` | ⏳ Planned | CorrelationId, Metrics, Logging, Tracing, OpenTelemetry |
-| V9 | `09-DistributedMessageBus` | ⏳ Planned | RabbitMQ, Multiple Services, Distributed Consumers |
+| V9 | `09-DistributedMessageBus` | ⏳ Planned | RabbitMQ, Producers, Consumers, Acknowledgements |
 | V10 | `10-ProductionMessagingPlatform` | ⏳ Planned | Outbox, Inbox, Eventual Consistency, Production Architecture |
 
-> ### Current Stage
+> ## Current Stage
 >
 > 🚧 **V2 — GenericMessageBus**
 
@@ -196,204 +1790,122 @@ The repository evolves through multiple versions.
 
 # V1 — PrimitiveQueue
 
-The first version intentionally starts with low-level .NET primitives.
-
-The implementation is based on concepts such as:
+The first implementation intentionally uses low-level primitives:
 
 ```text
 Queue<T>
+
 Thread
+
 lock
+
 Monitor.Wait
+
 Monitor.Pulse
-Producer
-Consumer
-Worker Thread
-Polling
-Retry
 ```
 
-The basic architecture looks like this:
+The goal is to understand how Producer / Consumer communication works before replacing it with higher-level abstractions.
+
+Conceptually:
 
 ```text
 Producer
    │
    │ Enqueue
    ▼
-┌───────────────┐
-│   Queue<T>    │
-└───────┬───────┘
-        │
-        │ Dequeue
-        ▼
-   Worker Thread
-        │
-        ▼
-     Execute
+┌─────────────┐
+│  Queue<T>   │
+└──────┬──────┘
+       │
+       │ Dequeue
+       ▼
+    Worker
+       │
+       ▼
+    Execute
 ```
 
-When there is no work available, the worker waits:
+The worker sleeps while no work exists:
 
 ```csharp
 Monitor.Wait(...)
 ```
 
-When a producer adds a message:
+and the producer wakes the worker:
 
 ```csharp
-queue.Enqueue(message);
-
-Monitor.Pulse(...);
+Monitor.Pulse(...)
 ```
 
-the worker wakes up and continues processing.
+V1 intentionally contains more domain-specific and duplicated implementations.
 
-This version helps demonstrate the basic **Producer / Consumer** model and low-level thread synchronization.
-
----
-
-## Domain-Specific Retry Queues
-
-V1 also contains queue implementations created for specific operations.
-
-The idea is roughly:
+They allow us to discover problems such as:
 
 ```text
-Operation
-    │
-    ▼
-Send Request
-    │
-    ├──────── Success ────────► Remove
-    │
-    └──────── Failure
-                │
-                ▼
-            TryCount++
-                │
-                ▼
-          NextTryTime
-                │
-                ▼
-           Retry Later
+Domain Coupling
+
+Duplicate Retry Logic
+
+Manual Synchronization
+
+Message Type Switches
+
+Blocking Operations
+
+Thread Management
 ```
 
-These queues introduce concepts such as:
-
-```text
-Retry
-Delayed Retry
-Polling
-Backoff
-TryCount
-NextTryTime
-Failure Handling
-```
-
-They work, but they expose several architectural problems.
-
----
-
-# Problems Discovered in V1
-
-## Domain Coupling
-
-The infrastructure starts knowing too much about the business operation.
-
-Instead of having a generic queue engine, separate queue implementations begin to appear.
-
-The question becomes:
-
-> Why should queue infrastructure know what a specific business operation means?
-
-Ideally:
-
-```text
-Infrastructure
-      │
-      ▼
-Process Message
-```
-
-not:
-
-```text
-Infrastructure
-      │
-      ├── Understand Operation A
-      ├── Understand Operation B
-      └── Understand Operation C
-```
-
----
-
-## Duplicate Infrastructure Logic
-
-Different queue implementations start repeating the same mechanisms:
-
-```text
-Queue storage
-Locking
-Retry count
-Next retry time
-Polling
-Error handling
-Removing completed messages
-Maximum retry count
-```
-
-Only the business operation changes.
-
-This is one of the main reasons V2 exists.
-
----
-
-## Message Type Switches
-
-A worker may eventually need code similar to:
-
-```csharp
-switch (message.MessageType)
-{
-    case MessageType.A:
-        // process A
-        break;
-
-    case MessageType.B:
-        // process B
-        break;
-}
-```
-
-Every new message requires modifying the queue infrastructure.
-
-This creates unnecessary coupling.
-
-A better architecture should allow new messages and handlers to be introduced **without changing the worker itself**.
+These problems create V2.
 
 ---
 
 # V2 — GenericMessageBus
 
-V2 begins transforming the primitive queue into a reusable message processing system.
+> 🚧 **Current Version**
 
-The infrastructure should no longer care about the business meaning of a message.
+V2 begins moving away from domain-specific queues and manual low-level processing.
 
-Instead of creating infrastructure classes for every operation, we introduce generic concepts such as:
+Important concepts introduced include:
 
 ```text
 IMessage
+
 ICommand
+
 IQuery<TResult>
+
 MessageEnvelope
-MessageDispatcher
+
 MessageHandle
+
+MessageDispatcher
+
 WorkQueue
+
 MessageBus
+
+Task
+
+async / await
+
+Channel<T>
+
+ConcurrentDictionary
+
+CancellationToken
+
+TaskCompletionSource<T>
+
 RetryPolicy
+
+Timeout
+
+Bounded Queues
+
+Backpressure
 ```
 
-The architecture begins to look like this:
+The architecture begins to evolve toward:
 
 ```text
                          MessageBus
@@ -422,530 +1934,71 @@ The architecture begins to look like this:
 
 ---
 
-# Commands and Queries
-
-Commands represent an intention to perform an operation.
-
-Example:
-
-```csharp
-public record CreateOrderCommand(
-    int CustomerId,
-    decimal Amount
-) : ICommand;
-```
-
-Queries represent a request for information.
-
-```csharp
-public record GetOrderQuery(
-    int OrderId
-) : IQuery<OrderResponse>;
-```
-
-The queue does not need to know what these messages actually do.
-
-It only needs to know how to deliver them to the correct handler.
-
----
-
-# Message Dispatcher
-
-Instead of using a large `switch` statement, handlers are registered independently.
-
-Conceptually:
-
-```text
-CreateOrderCommand
-        │
-        ▼
-    Dispatcher
-        │
-        ▼
-CreateOrderHandler
-```
-
-and:
-
-```text
-GetOrderQuery
-       │
-       ▼
-   Dispatcher
-       │
-       ▼
-GetOrderHandler
-```
-
-This separates:
-
-```text
-Message Processing Infrastructure
-```
-
-from:
-
-```text
-Business Logic
-```
-
----
-
-# Message Envelope
-
-A business message should contain business information.
-
-Infrastructure information belongs somewhere else.
-
-For that reason messages are wrapped in an envelope.
-
-```text
-MessageEnvelope
-│
-├── MessageId
-├── Message
-├── CreatedAt
-├── Attempt
-├── RetryPolicy
-├── Timeout
-├── CancellationToken
-└── Completion
-```
-
-For example:
-
-```text
-CreateOrderCommand
-        │
-        ▼
-┌─────────────────────────┐
-│     MessageEnvelope     │
-├─────────────────────────┤
-│ Id                      │
-│ Attempt                 │
-│ RetryPolicy             │
-│ Timeout                 │
-│ Cancellation            │
-│ Completion              │
-│                         │
-│ Message                 │
-│   └─ CreateOrderCommand │
-└─────────────────────────┘
-```
-
-This keeps business messages clean while allowing the messaging infrastructure to track processing metadata.
-
----
-
-# Retry
-
-Failures are expected when communicating with external systems.
-
-A message may therefore define a retry policy.
-
-For example:
-
-```text
-Attempt 1
-    │
-    X
-    │
-  1 second
-    │
-Attempt 2
-    │
-    X
-    │
-  2 seconds
-    │
-Attempt 3
-    │
-    X
-    │
-  4 seconds
-    │
-Attempt 4
-```
-
-This introduces concepts such as:
-
-```text
-Fixed Retry
-Linear Backoff
-Exponential Backoff
-Maximum Attempts
-Retryable Exceptions
-```
-
-Later versions will expand this into more advanced resilience patterns.
-
----
-
-# Delayed Retry Without Blocking Workers
-
-A worker should not sleep while waiting for a message retry.
-
-Bad:
-
-```text
-Message A fails
-        │
-        ▼
-Worker sleeps for 5 minutes
-        │
-        ▼
-Worker cannot process anything else
-```
-
-Better:
-
-```text
-Message A fails
-        │
-        ▼
-Retry scheduled
-        │
-        └─────────────── 5 minutes ───────────────┐
-                                                  │
-Worker continues                                  │
-        │                                         │
-        ├── Message B                             │
-        ├── Message C                             │
-        └── Message D                             │
-                                                  │
-                                                  ▼
-                                         Message A returns
-```
-
-This is an important step from blocking thread-based designs toward asynchronous message processing.
-
----
-
-# Cancellation
-
-Messages can be canceled using `CancellationToken`.
-
-A message may be:
-
-```text
-Waiting
-Processing
-Waiting for Retry
-```
-
-and cancellation should be able to propagate through the execution pipeline.
-
-For example:
-
-```csharp
-await httpClient.SendAsync(
-    request,
-    cancellationToken);
-```
-
-This introduces the idea of **cooperative cancellation**.
-
----
-
-# Timeout
-
-Cancellation and timeout are not the same thing.
-
-Cancellation means:
-
-> The caller no longer wants the operation.
-
-Timeout means:
-
-> The operation took longer than it was allowed to take.
-
-Example:
-
-```csharp
-new MessageOptions
-{
-    Timeout = TimeSpan.FromSeconds(5)
-};
-```
-
-A timeout may later trigger retry logic.
-
-```text
-Request
-   │
-   │ > 5 seconds
-   ▼
-Timeout
-   │
-   ▼
-Retry Policy
-   │
-   ├── Retry
-   └── Stop
-```
-
----
-
-# ConcurrentDictionary
-
-As the architecture evolves, multiple execution paths may need to access the collection of pending messages.
-
-For example:
-
-```text
-Producer
-   │
-   └── Add pending message
-
-Worker
-   │
-   └── Remove completed message
-
-Another Thread
-   │
-   └── Find message to cancel
-```
-
-Using a normal `Dictionary<TKey,TValue>` from multiple threads would introduce thread-safety problems.
-
-This creates a real reason to introduce:
-
-```csharp
-ConcurrentDictionary<TKey, TValue>
-```
-
-Again, the concept is introduced because the architecture creates the need for it.
-
----
-
-# Channel<T>
-
-V1 manually combines:
-
-```text
-Queue<T>
-Thread
-lock
-Monitor.Wait
-Monitor.Pulse
-```
-
-V2 begins moving toward:
-
-```csharp
-Channel<T>
-```
-
-`Channel<T>` provides a higher-level asynchronous Producer / Consumer abstraction.
-
-Conceptually:
-
-```text
-Producer
-   │
-   ▼
-Channel<T>
-   │
-   ▼
-Consumer
-```
-
-It also makes later concepts such as **bounded capacity and backpressure** easier to implement.
-
----
-
 # Why Console Applications?
 
-The early versions intentionally use Console Applications as lightweight hosts.
+The early stages intentionally use Console Applications.
 
-This is a deliberate choice.
+The Console Application is only a lightweight host used to observe the messaging architecture.
 
-The purpose of the early stages is to focus on:
+It allows us to focus on:
 
 ```text
 Threading
-Concurrency
+
 Synchronization
-Message Processing
-Retry
+
+Concurrency
+
+async / await
+
+Queues
+
+Workers
+
+Retries
+
 Cancellation
-Queue Behavior
 ```
 
 without introducing unrelated concerns such as:
 
 ```text
-HTTP
 Controllers
+
+HTTP
+
 Swagger
-UI
+
 Authentication
-Database APIs
+
+UI
+
 Web Framework Configuration
 ```
 
-The queue implementation itself can live inside reusable class libraries while a Console Application demonstrates its behavior.
-
-As the repository evolves toward distributed messaging, later versions will introduce technologies such as:
+Later versions will naturally introduce:
 
 ```text
 ASP.NET Core
+
 Worker Services
-Databases
-RabbitMQ
-OpenTelemetry
-Distributed Services
-```
 
-The Console Application is therefore only the **host used to observe the architecture**, not the architecture itself.
-
----
-
-# What Will We Learn?
-
-Throughout this evolution, the repository will gradually explore:
-
-```text
-Thread
-ThreadPool
-Task
-async / await
-
-Blocking vs Non-Blocking
-
-Concurrency vs Parallelism
-
-Producer / Consumer
-
-Race Conditions
-Critical Sections
-
-lock
-
-Monitor.Wait
-Monitor.Pulse
-
-ConcurrentQueue<T>
-ConcurrentDictionary<TKey,TValue>
-
-TaskCompletionSource<T>
-
-CancellationToken
-CancellationTokenSource
-Linked Cancellation Tokens
-
-SemaphoreSlim
-
-Channel<T>
-
-Bounded Channels
-Unbounded Channels
-
-Backpressure
-
-Multiple Consumers
-Ordering
-
-Retry
-Delayed Retry
-Exponential Backoff
-
-Timeout
-
-Circuit Breaker
-
-Priority Queues
-
-Scheduled Messages
-
-Persistence
-
-Recovery
-
-Dead Letter Queue
-
-Idempotency
-
-Deduplication
-
-CorrelationId
-
-Metrics
-Tracing
-OpenTelemetry
-
-Distributed Messaging
+SQL Server
 
 RabbitMQ
 
-Outbox Pattern
-Inbox Pattern
+OpenTelemetry
 
-Eventual Consistency
+Multiple Services
 ```
 
-These concepts will not be added only because they are popular.
-
-Each one should answer a problem that appeared in the previous version.
-
----
-
-# Future Evolution
-
-The long-term direction of the project is:
-
-```text
-V1
-PrimitiveQueue
-     │
-     ▼
-V2
-GenericMessageBus
-     │
-     ▼
-V3
-ResilientMessageBus
-     │
-     ▼
-V4
-ConcurrentMessageBus
-     │
-     ▼
-V5
-AdvancedQueueing
-     │
-     ▼
-V6
-PersistentMessageBus
-     │
-     ▼
-V7
-ReliableMessageBus
-     │
-     ▼
-V8
-ObservableMessageBus
-     │
-     ▼
-V9
-DistributedMessageBus
-     │
-     ▼
-V10
-ProductionMessagingPlatform
-```
-
-The final goal is not to compete with existing production-ready messaging frameworks.
-
-The goal is to understand **why those frameworks look the way they do**.
+when the architecture actually requires them.
 
 ---
 
 # What This Repository Is Not
 
-This repository is an educational architecture experiment.
-
-It is not intended to replace:
+This repository is not intended to replace:
 
 - RabbitMQ
 - MassTransit
@@ -955,43 +2008,76 @@ It is not intended to replace:
 - Hangfire
 - Polly
 
-Instead, these technologies become easier to understand after experiencing the problems they were designed to solve.
+It is an educational architecture experiment designed to understand **why systems like these need the abstractions they provide**.
 
-For example:
+Instead of memorizing:
 
 ```text
-Why does RabbitMQ need acknowledgements?
-
-Why does MassTransit have consumers?
-
-Why does MediatR use handlers?
-
-Why does Polly provide retry and circuit breaker policies?
-
-Why do message brokers have Dead Letter Queues?
-
-Why do distributed systems need idempotency?
-
-Why does the Outbox Pattern exist?
+Retry
+DLQ
+Acknowledgement
+Idempotency
+Outbox
+Backpressure
+Consumer
+Dispatcher
+Circuit Breaker
 ```
 
-Instead of memorizing the answers, this repository attempts to **reach those problems naturally by evolving the architecture**.
+we want to naturally encounter the problems that require them.
 
 ---
 
-# The Core Idea
+# Final Goal
 
-The repository follows one simple principle:
+We start here:
+
+```text
+Queue<T>
+   +
+Thread
+   +
+lock
+   +
+Monitor
+```
+
+and gradually move toward:
+
+```text
+Message Bus
+   │
+   ├── Commands / Queries
+   ├── Multiple Consumers
+   ├── Retry / Backoff
+   ├── Cancellation / Timeout
+   ├── Backpressure
+   ├── Persistence
+   ├── Dead Letter Queue
+   ├── Idempotency
+   ├── Observability
+   ├── RabbitMQ
+   ├── Outbox / Inbox
+   └── Eventual Consistency
+```
+
+But the final implementation is not the most important part.
+
+The important part is understanding **why every step became necessary**.
+
+---
+
+# Core Idea
 
 > **Do not start with the abstraction. Start with the problem that creates the abstraction.**
 
-And that leads to the central idea behind the project:
+And most importantly:
 
 > **The queue is the project. Concurrency is the subject.**
 
 We are not learning concurrency just to build a queue.
 
-We are building a queue so that we can understand concurrency.
+**We are building a queue so that we can understand concurrency.**
 
 ---
 
@@ -1005,8 +2091,25 @@ Current stage:
 V2 — GenericMessageBus
 ```
 
-Previous implementations are intentionally kept so that each architectural step can be compared with the version that came before it.
+Older implementations are intentionally kept in the repository.
+
+Each version should make it possible to compare:
+
+```text
+Previous Solution
+        │
+        ▼
+New Problem
+        │
+        ▼
+New Concept
+        │
+        ▼
+Better Architecture
+```
 
 The destination matters.
 
-But in this repository, **the evolution is the actual lesson**.
+But in this repository:
+
+> **The evolution is the actual lesson.**
