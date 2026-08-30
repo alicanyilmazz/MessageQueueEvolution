@@ -1,5 +1,21 @@
 # MessageQueueEvolution
 
+# Evolution Roadmap
+
+| Version | Stage | Status | Main Focus |
+|---|---|---|---|
+| V1 | `01-PrimitiveQueue` | ✅ Completed | Thread, Queue, lock, Monitor, Producer / Consumer |
+| V2 | `02-GenericMessageBus` | 🚧 Current | Task, async/await, Channel, ConcurrentDictionary, Command / Query, Retry, Cancellation |
+| V3 | `03-ResilientMessageBus` | ⏳ Planned | Retry Policies, Backoff, Timeout, Circuit Breaker |
+| V4 | `04-ConcurrentMessageBus` | ⏳ Planned | Multiple Workers, SemaphoreSlim, Race Conditions, Ordering |
+| V5 | `05-AdvancedQueueing` | ⏳ Planned | Priority, Scheduling, Delayed Messages, Backpressure |
+| V6 | `06-PersistentMessageBus` | ⏳ Planned | Persistence, Recovery, Durable Messages |
+| V7 | `07-ReliableMessageBus` | ⏳ Planned | DLQ, Idempotency, Deduplication, Delivery Semantics |
+| V8 | `08-ObservableMessageBus` | ⏳ Planned | CorrelationId, Metrics, Logging, Tracing, OpenTelemetry |
+| V9 | `09-DistributedMessageBus` | ⏳ Planned | RabbitMQ, Producers, Consumers, Acknowledgements |
+| V10 | `10-ProductionMessagingPlatform` | ⏳ Planned | Outbox, Inbox, Eventual Consistency, Production Architecture |
+
+
 > **The queue is the project. Concurrency is the subject.**
 
 `MessageQueueEvolution` is a step-by-step journey through **threading, asynchronous programming, concurrency, synchronization, resilience, and message processing in C#/.NET**.
